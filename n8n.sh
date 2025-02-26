@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Cập nhật hệ thống
-sudo apt update && sudo apt upgrade -y
+set -e  # Dừng script nếu có lệnh nào lỗi
 
 # Cài đặt các gói cần thiết
 sudo apt install -y ca-certificates curl gnupg
@@ -25,6 +24,10 @@ sudo apt install -y docker-compose
 # Bật Docker khởi động cùng hệ thống và khởi động Docker ngay lập tức
 sudo systemctl enable docker
 sudo systemctl start docker
+
+# Chờ Docker khởi động hoàn tất
+sleep 5
+sudo systemctl is-active --quiet docker || { echo "Docker không khởi động được!"; exit 1; }
 
 # Tạo thư mục cho n8n và chuyển vào thư mục đó
 mkdir -p ~/n8n_data && cd ~/n8n_data
@@ -80,10 +83,14 @@ volumes:
   n8n_data:
 EOL
 
-# khởi chạy n8n và postgresql
+# Khởi chạy n8n và postgresql
 docker-compose up -d
 
-# cài đặt nginx
+# Chờ container khởi động
+sleep 10
+docker ps | grep n8n || { echo "n8n container không chạy!"; exit 1; }
+
+# Cài đặt Nginx
 sudo apt install -y nginx
 
 # Tạo file cấu hình Nginx cho n8n
@@ -118,11 +125,18 @@ server {
 EOL
 
 # Tạo symlink để kích hoạt site
-ln -s /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/
 
 # Kiểm tra và reload Nginx
 sudo nginx -t && sudo systemctl restart nginx
 
-# cài đặt SSL
+# Chờ Nginx khởi động
+sleep 5
+sudo systemctl is-active --quiet nginx || { echo "Nginx không khởi động được!"; exit 1; }
+
+# Cài đặt SSL
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d n8n.vokieumy.com
+sudo certbot --nginx -d n8n.vokieumy.com --non-interactive --agree-tos -m your-email@example.com
+
+# Hoàn tất
+echo "Cài đặt hoàn tất!"
