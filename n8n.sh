@@ -2,6 +2,17 @@
 
 set -e  # Dừng script nếu có lệnh nào lỗi
 
+# Hỏi người dùng để điền thông tin
+read -p "Nhập domain của bạn: " DOMAIN
+read -p "Nhập email của bạn: " EMAIL
+read -p "Nhập n8n user: " N8N_USER
+read -s -p "Nhập n8n password: " N8N_PASS
+echo
+read -p "Nhập tên database: " DB_NAME
+read -p "Nhập user database: " DB_USER
+read -s -p "Nhập mật khẩu database: " DB_PASS
+echo
+
 # Cài đặt các gói cần thiết
 sudo apt install -y ca-certificates curl gnupg
 
@@ -42,9 +53,9 @@ services:
     container_name: postgres
     restart: always
     environment:
-      POSTGRES_USER: n8n
-      POSTGRES_PASSWORD: n8npassword
-      POSTGRES_DB: n8n
+      POSTGRES_USER: $DB_USER
+      POSTGRES_PASSWORD: $DB_PASS
+      POSTGRES_DB: $DB_NAME
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -58,21 +69,21 @@ services:
       - "5678:5678"
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=yourpassword
+      - N8N_BASIC_AUTH_USER=$N8N_USER
+      - N8N_BASIC_AUTH_PASSWORD=$N8N_PASS
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=n8n
-      - DB_POSTGRESDB_PASSWORD=n8npassword
-      - N8N_HOST=n8n.vokieumy.com
+      - DB_POSTGRESDB_DATABASE=$DB_NAME
+      - DB_POSTGRESDB_USER=$DB_USER
+      - DB_POSTGRESDB_PASSWORD=$DB_PASS
+      - N8N_HOST=$DOMAIN
       - N8N_PROTOCOL=https
       - N8N_PORT=5678
-      - WEBHOOK_URL=https://n8n.vokieumy.com/
-      - N8N_EDITOR_BASE_URL=https://n8n.vokieumy.com/
-      - N8N_PUBLIC_API_HOST=n8n.vokieumy.com
-      - VUE_APP_URL_BASE_API=https://n8n.vokieumy.com/
+      - WEBHOOK_URL=https://$DOMAIN/
+      - N8N_EDITOR_BASE_URL=https://$DOMAIN/
+      - N8N_PUBLIC_API_HOST=$DOMAIN
+      - VUE_APP_URL_BASE_API=https://$DOMAIN/
     depends_on:
       - postgres
     volumes:
@@ -96,7 +107,7 @@ sudo apt install -y nginx
 # Tạo file cấu hình Nginx cho n8n
 cat <<EOL > /etc/nginx/sites-available/n8n
 server {
-    server_name n8n.vokieumy.com;
+    server_name $DOMAIN;
 
     location / {
         proxy_pass http://localhost:5678;
@@ -119,7 +130,7 @@ server {
 
 server {
     listen 80;
-    server_name n8n.vokieumy.com;
+    server_name $DOMAIN;
     return 301 https://\$host\$request_uri;
 }
 EOL
@@ -136,7 +147,7 @@ sudo systemctl is-active --quiet nginx || { echo "Nginx không khởi động đ
 
 # Cài đặt SSL
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d n8n.vokieumy.com --non-interactive --agree-tos -m your-email@example.com
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
 
 # Hoàn tất
 echo "Cài đặt hoàn tất!"
